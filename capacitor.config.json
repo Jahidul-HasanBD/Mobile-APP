@@ -2,8 +2,12 @@
   "appId": "com.medremind.app",
   "appName": "MedRemind",
   "webDir": "www",
-  "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
   }
 }

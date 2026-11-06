@@ -1,0 +1,12 @@
+# Prevent directory browsing.
+Options -Indexes
+
+# OPTIONS (CORS preflight) is answered by config/cors.php. The old
+# `RewriteRule ... [R=200]` sent a response before PHP ran, so preflight
+# requests never received Access-Control-* headers.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never serve configuration files directly.
+    RewriteRule ^config/ - [F,L]
+</IfModule>

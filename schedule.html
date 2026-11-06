@@ -2,31 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Schedule - MedRemind</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { 50: '#ECFEFF', 100: '#CFFAFE', 200: '#A5F3FC', 300: '#67E8F9', 400: '#22D3EE', 500: '#0891B2', 600: '#0E7490', 700: '#155E75', 800: '#164E63', 900: '#083344' },
-            cta: { 50: '#ECFDF5', 100: '#D1FAE5', 200: '#A7F3D0', 300: '#6EE7B7', 400: '#34D399', 500: '#059669', 600: '#047857', 700: '#065F46', 800: '#064E3B', 900: '#022C22' },
-          },
-          fontFamily: {
-            heading: ['Fira Code', 'monospace'],
-            body: ['Fira Sans', 'sans-serif'],
-          },
-        },
-      },
-    }
-  </script>
+  <link rel="stylesheet" href="css/tailwind.css">
   <style>
-    * { font-family: 'Fira Sans', sans-serif; }
-    h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Fira Code', monospace; }
+    * { font-family: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     
     .nav-link { transition: color 200ms ease, background-color 200ms ease; }
     .nav-link.active { color: #0891B2; background-color: #ECFEFF; }
@@ -58,6 +42,20 @@
     .calendar-day.has-meds { position: relative; }
     .calendar-day.has-meds::after { content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background-color: #059669; border-radius: 50%; }
     
+    /* Edge-to-edge Android (targetSdk 35+): the webview is drawn under the
+       status bar / navigation bar, so the page keeps its own chrome clear of
+       them. Capacitor 8's SystemBars plugin injects the real values as
+       --safe-area-inset-* (env() reports wrong values on Android WebView < 140);
+       env() stays the fallback. On old webviews the plugin insets the webview
+       natively instead and these variables are 0, so the two never stack. */
+    header.sticky {
+      padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    }
+    @media (max-width: 767px) {
+      body { padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
+    }
+    nav.fixed.bottom-0 { padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
+
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }
     }
@@ -100,7 +98,7 @@
         <div class="flex items-center gap-3">
           <a href="profile.html" class="flex items-center gap-2">
             <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span class="text-sm font-medium text-primary-600">JD</span>
+              <span class="text-sm font-medium text-primary-600" data-user-initials>JD</span>
             </div>
           </a>
           <button id="mobileMenuBtn" class="md:hidden p-2 text-primary-600 hover:text-primary-800 transition-colors cursor-pointer" aria-label="Open menu" aria-expanded="false">
@@ -128,7 +126,7 @@
         <h1 class="font-heading text-2xl sm:text-3xl font-bold text-primary-800 mb-1">Schedule</h1>
         <p class="text-primary-600">View and manage your medication schedule</p>
       </div>
-      <button onclick="openModal('addScheduleModal')" class="btn-cta inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-white font-medium cursor-pointer">
+      <button onclick="openAddSchedule()" class="btn-cta inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-white font-medium cursor-pointer">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
@@ -143,12 +141,12 @@
       <div class="lg:col-span-1">
         <div class="bg-white rounded-xl card-shadow p-5">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="font-heading text-base font-semibold text-primary-800">June 2025</h2>
+            <h2 id="calendarMonth" class="font-heading text-base font-semibold text-primary-800">Month</h2>
             <div class="flex gap-1">
-              <button class="p-1 text-primary-400 hover:text-primary-600 transition-colors cursor-pointer" aria-label="Previous month">
+              <button id="prevMonth" class="p-1 text-primary-400 hover:text-primary-600 transition-colors cursor-pointer" aria-label="Previous month">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
               </button>
-              <button class="p-1 text-primary-400 hover:text-primary-600 transition-colors cursor-pointer" aria-label="Next month">
+              <button id="nextMonth" class="p-1 text-primary-400 hover:text-primary-600 transition-colors cursor-pointer" aria-label="Next month">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>
@@ -189,11 +187,12 @@
           <div class="px-6 py-4 border-b border-primary-100 flex items-center justify-between">
             <h2 class="font-heading text-lg font-semibold text-primary-800" id="selectedDateTitle">Today's Schedule</h2>
             <div class="flex items-center gap-2">
-              <button class="text-xs font-medium text-primary-500 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">Print</button>
+              <button id="enableRemindersBtn" class="text-xs font-medium text-cta-600 hover:text-cta-700 bg-cta-50 hover:bg-cta-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">Enable Reminders</button>
+              <button onclick="window.print()" class="text-xs font-medium text-primary-500 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">Print</button>
             </div>
           </div>
           
-          <div class="divide-y divide-primary-50">
+          <div id="scheduleList" class="divide-y divide-primary-50">
             <!-- Morning -->
             <div class="time-slot active px-6 py-4">
               <div class="flex items-center gap-3 mb-3">
@@ -361,10 +360,6 @@
             <label for="schedMed" class="block text-sm font-medium text-primary-700 mb-1">Medication *</label>
             <select id="schedMed" required class="input-focus w-full px-4 py-2.5 bg-primary-50 border border-primary-100 rounded-lg text-primary-800 transition-all duration-200 cursor-pointer">
               <option value="">Select medication...</option>
-              <option value="1">Amoxicillin - 500mg</option>
-              <option value="2">Metformin - 850mg</option>
-              <option value="3">Vitamin D3 - 1000 IU</option>
-              <option value="4">Lisinopril - 10mg</option>
             </select>
           </div>
           
@@ -422,71 +417,213 @@
     </div>
   </nav>
   
+  <script src="js/supabase.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/notifications.js"></script>
   <script>
-    // Mobile menu toggle
     document.getElementById('mobileMenuBtn').addEventListener('click', () => {
       const nav = document.getElementById('mobileNav');
       const isHidden = nav.classList.contains('hidden');
       nav.classList.toggle('hidden');
       document.getElementById('mobileMenuBtn').setAttribute('aria-expanded', isHidden);
     });
-    
-    // Modal functions
+
     function openModal(id) {
       document.getElementById(id).classList.remove('hidden');
       document.body.style.overflow = 'hidden';
     }
-    
+
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
       document.body.style.overflow = '';
     }
-    
-    // Calendar
+
+    const fmtDate = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const todayStr = fmtDate(new Date());
+    let currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    let selectedDate = todayStr;
+    let monthLogDates = new Set();
+    let schedulesCache = [];
+
+    if (requireAuth()) {
+      setHeaderUser();
+      initSchedule();
+    }
+
+    async function initSchedule() {
+      await loadMedicines();
+      await loadMonthLogs();
+      renderCalendar();
+      await loadSchedules(selectedDate);
+    }
+
+    async function loadMedicines() {
+      const data = await api('/medicines/index.php');
+      const select = document.getElementById('schedMed');
+      const meds = data.medicines || [];
+      select.innerHTML = '<option value="">Select medication...</option>' +
+        meds.map(m => '<option value="' + m.id + '">' + escapeHtml(m.name) + ' - ' + escapeHtml(m.dosage) + '</option>').join('');
+    }
+
+    async function loadMonthLogs() {
+      const first = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const last = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const data = await api('/logs/index.php?start_date=' + fmtDate(first) + '&end_date=' + fmtDate(last));
+      monthLogDates = new Set((data.logs || []).map(log => log.log_date));
+    }
+
     function renderCalendar() {
       const grid = document.getElementById('calendarGrid');
-      const daysWithMeds = [1, 2, 3, 5, 6, 8, 9, 10, 12, 13, 15, 16, 17, 19, 20, 22, 23, 24, 26, 27, 29, 30];
-      const today = 15;
-      
-      // June 2025 starts on Sunday (0)
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      document.getElementById('calendarMonth').textContent = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
       let html = '';
-      for (let i = 0; i < 35; i++) {
-        const day = i - 0 + 1; // Adjust for start day
-        if (day < 1 || day > 30) {
-          html += '<div class="p-2 text-center text-primary-300 text-sm"></div>';
-        } else {
-          const isToday = day === today;
-          const hasMeds = daysWithMeds.includes(day);
-          const classes = [
-            'calendar-day',
-            'p-2',
-            'text-center',
-            'rounded-lg',
-            'text-sm',
-            isToday ? 'today' : '',
-            hasMeds && !isToday ? 'has-meds' : ''
-          ].filter(Boolean).join(' ');
-          html += '<div class="' + classes + '" onclick="selectDay(' + day + ')">' + day + '</div>';
-        }
+      for (let i = 0; i < firstDay; i++) {
+        html += '<div class="p-2 text-center text-primary-300 text-sm"></div>';
+      }
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = fmtDate(new Date(year, month, day));
+        const classes = ['calendar-day', 'p-2', 'text-center', 'rounded-lg', 'text-sm'];
+        if (dateStr === todayStr) classes.push('today');
+        if (monthLogDates.has(dateStr) && dateStr !== todayStr) classes.push('has-meds');
+        if (dateStr === selectedDate) classes.push('selected');
+        html += '<div class="' + classes.join(' ') + '" data-date="' + dateStr + '" onclick="selectDay(\'' + dateStr + '\')">' + day + '</div>';
       }
       grid.innerHTML = html;
     }
-    
-    function selectDay(day) {
-      document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
-      event.target.classList.add('selected');
-      document.getElementById('selectedDateTitle').textContent = 'June ' + day + ', 2025 Schedule';
+
+    async function selectDay(dateStr) {
+      selectedDate = dateStr;
+      renderCalendar();
+      await loadSchedules(dateStr);
     }
-    
-    renderCalendar();
-    
-    // Add schedule
-    function handleAddSchedule(e) {
+
+    async function loadSchedules(date) {
+      const data = await api('/schedules/index.php?date=' + date);
+      schedulesCache = data.schedules || [];
+      document.getElementById('selectedDateTitle').textContent = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' Schedule';
+      renderScheduleList(schedulesCache);
+    }
+
+    function renderScheduleList(schedules) {
+      const list = document.getElementById('scheduleList');
+      if (!schedules.length) {
+        list.innerHTML = '<div class="px-6 py-12 text-center"><p class="text-primary-500 mb-3">No schedules yet for this day.</p><button onclick="openAddSchedule()" class="text-sm font-medium text-primary-500 hover:text-primary-700">Add a schedule</button></div>';
+        return;
+      }
+
+      list.innerHTML = schedules.map(s => {
+        const status = s.log_status || 'pending';
+        return '<div class="px-6 py-4" data-schedule-id="' + s.id + '">' +
+          '<div class="flex items-center justify-between gap-3 mb-3">' +
+            '<div class="flex items-center gap-3">' +
+              '<div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">' +
+                '<svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' +
+              '</div>' +
+              '<div><h3 class="font-heading text-sm font-semibold text-primary-800">' + formatTime(s.time) + '</h3>' +
+              '<p class="text-xs text-primary-500">' + escapeHtml(s.medicine_name) + ' - ' + escapeHtml(s.dosage) + '</p></div>' +
+            '</div>' +
+            '<span class="' + statusClass(status) + ' px-2.5 py-1 rounded-full text-xs font-medium">' + statusLabel(status) + '</span>' +
+          '</div>' +
+          '<div class="ml-11 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-primary-50 rounded-lg p-3">' +
+            '<p class="text-xs text-primary-500">' + mealLabel(s.meal_relation) + ' · ' + escapeHtml(s.repeat_type || 'daily') + '</p>' +
+            '<div class="flex items-center gap-2">' +
+              '<button onclick="markSchedule(' + s.id + ', \'snoozed\')" class="px-2.5 py-1.5 text-xs font-medium text-primary-600 bg-white rounded-lg border border-primary-100 hover:bg-primary-100 transition-colors cursor-pointer">Snooze</button>' +
+              '<button onclick="markSchedule(' + s.id + ', \'taken\')" class="px-2.5 py-1.5 text-xs font-medium text-white bg-cta-500 rounded-lg hover:bg-cta-600 transition-colors cursor-pointer">Taken</button>' +
+              '<button onclick="deleteSchedule(' + s.id + ')" class="p-1.5 text-red-400 hover:text-red-600 transition-colors cursor-pointer" aria-label="Delete schedule">' +
+                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function markSchedule(id, status) {
+      const res = await api('/logs/index.php', {
+        method: 'POST',
+        body: JSON.stringify({ schedule_id: id, status: status, log_date: selectedDate })
+      });
+      if (res.error) { alert(res.error); return; }
+      await loadMonthLogs();
+      renderCalendar();
+      await loadSchedules(selectedDate);
+    }
+
+    async function deleteSchedule(id) {
+      if (!confirm('Delete this schedule?')) return;
+      const res = await api('/schedules/single.php?id=' + id, { method: 'DELETE' });
+      if (res.error) { alert(res.error); return; }
+      await loadMonthLogs();
+      renderCalendar();
+      await loadSchedules(selectedDate);
+    }
+
+    async function openAddSchedule() {
+      await loadMedicines();
+      openModal('addScheduleModal');
+    }
+
+    async function handleAddSchedule(e) {
       e.preventDefault();
+      const medicineId = Number(document.getElementById('schedMed').value);
+      const time = document.getElementById('schedTime').value;
+      const meal = document.getElementById('schedMeal').value;
+      const repeat = document.getElementById('schedRepeat').value;
+
+      const res = await api('/schedules/index.php', {
+        method: 'POST',
+        body: JSON.stringify({
+          medicine_id: medicineId,
+          time: time.length === 5 ? time + ':00' : time,
+          meal_relation: meal,
+          repeat_type: repeat
+        })
+      });
+
+      if (res.error) { alert(res.error); return; }
       closeModal('addScheduleModal');
       e.target.reset();
-      alert('Schedule added successfully!');
+      await loadMonthLogs();
+      renderCalendar();
+      await loadSchedules(selectedDate);
     }
+
+    document.getElementById('prevMonth').addEventListener('click', async () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      if (!selectedDate.startsWith(currentMonth.getFullYear() + '-' + String(currentMonth.getMonth() + 1).padStart(2, '0'))) {
+        selectedDate = fmtDate(currentMonth);
+      }
+      await loadMonthLogs();
+      renderCalendar();
+      await loadSchedules(selectedDate);
+    });
+
+    document.getElementById('nextMonth').addEventListener('click', async () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+      if (!selectedDate.startsWith(currentMonth.getFullYear() + '-' + String(currentMonth.getMonth() + 1).padStart(2, '0'))) {
+        selectedDate = fmtDate(currentMonth);
+      }
+      await loadMonthLogs();
+      renderCalendar();
+      await loadSchedules(selectedDate);
+    });
+
+    document.getElementById('enableRemindersBtn').addEventListener('click', async () => {
+      if (!ReminderEngine.isNative() && !('Notification' in window)) {
+        alert('Browser notifications need HTTPS or the Android app. Your schedules still work normally.');
+        return;
+      }
+      const granted = await ReminderEngine.requestPermission();
+      if (!granted) { alert('Notification permission denied.'); return; }
+      const scheduled = await ReminderEngine.scheduleAll(schedulesCache);
+      if (!scheduled) { alert('Could not enable reminders on this device.'); return; }
+      alert('Daily reminders enabled for your active schedules.');
+    });
   </script>
 </body>
 </html>

@@ -1,0 +1,2 @@
+# Per-install signing secret generated at runtime — never commit it.
+.auth_secret

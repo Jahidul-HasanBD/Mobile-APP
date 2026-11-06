@@ -2,31 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Dashboard - MedRemind</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { 50: '#ECFEFF', 100: '#CFFAFE', 200: '#A5F3FC', 300: '#67E8F9', 400: '#22D3EE', 500: '#0891B2', 600: '#0E7490', 700: '#155E75', 800: '#164E63', 900: '#083344' },
-            cta: { 50: '#ECFDF5', 100: '#D1FAE5', 200: '#A7F3D0', 300: '#6EE7B7', 400: '#34D399', 500: '#059669', 600: '#047857', 700: '#065F46', 800: '#064E3B', 900: '#022C22' },
-          },
-          fontFamily: {
-            heading: ['Fira Code', 'monospace'],
-            body: ['Fira Sans', 'sans-serif'],
-          },
-        },
-      },
-    }
-  </script>
+  <link rel="stylesheet" href="css/tailwind.css">
   <style>
-    * { font-family: 'Fira Sans', sans-serif; }
-    h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Fira Code', monospace; }
+    * { font-family: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     
     .nav-link { transition: color 200ms ease, background-color 200ms ease; }
     .nav-link.active { color: #0891B2; background-color: #ECFEFF; }
@@ -42,6 +26,20 @@
     
     .progress-ring { transform: rotate(-90deg); }
     
+    /* Edge-to-edge Android (targetSdk 35+): the webview is drawn under the
+       status bar / navigation bar, so the page keeps its own chrome clear of
+       them. Capacitor 8's SystemBars plugin injects the real values as
+       --safe-area-inset-* (env() reports wrong values on Android WebView < 140);
+       env() stays the fallback. On old webviews the plugin insets the webview
+       natively instead and these variables are 0, so the two never stack. */
+    header.sticky {
+      padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    }
+    @media (max-width: 767px) {
+      body { padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
+    }
+    nav.fixed.bottom-0 { padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
+
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }
     }
@@ -108,7 +106,7 @@
           
           <a href="profile.html" class="flex items-center gap-2">
             <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span class="text-sm font-medium text-primary-600">JD</span>
+              <span class="text-sm font-medium text-primary-600" data-user-initials>JD</span>
             </div>
           </a>
           
@@ -138,8 +136,8 @@
     
     <!-- Welcome Section -->
     <div class="mb-8">
-      <h1 class="font-heading text-2xl sm:text-3xl font-bold text-primary-800 mb-2">Good morning, John</h1>
-      <p class="text-primary-600">You have <span class="font-semibold text-primary-700">3 medications</span> scheduled for today</p>
+      <h1 id="greetingName" class="font-heading text-2xl sm:text-3xl font-bold text-primary-800 mb-2">Good morning</h1>
+      <p class="text-primary-600">You have <span id="todayCount" class="font-semibold text-primary-700">0 medications</span> scheduled for today</p>
     </div>
     
     <!-- Stats Cards -->
@@ -152,7 +150,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-primary-800">5</p>
+            <p id="statTaken" class="text-2xl font-bold text-primary-800">0</p>
             <p class="text-xs text-primary-500">Taken Today</p>
           </div>
         </div>
@@ -166,7 +164,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-primary-800">3</p>
+            <p id="statPending" class="text-2xl font-bold text-primary-800">0</p>
             <p class="text-xs text-primary-500">Pending</p>
           </div>
         </div>
@@ -180,7 +178,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-primary-800">1</p>
+            <p id="statLowStock" class="text-2xl font-bold text-primary-800">0</p>
             <p class="text-xs text-primary-500">Low Stock</p>
           </div>
         </div>
@@ -194,7 +192,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-primary-800">87%</p>
+            <p id="statWeekly" class="text-2xl font-bold text-primary-800">0%</p>
             <p class="text-xs text-primary-500">Weekly Rate</p>
           </div>
         </div>
@@ -208,10 +206,10 @@
         <div class="bg-white rounded-xl card-shadow overflow-hidden">
           <div class="px-6 py-4 border-b border-primary-100 flex items-center justify-between">
             <h2 class="font-heading text-lg font-semibold text-primary-800">Today's Medications</h2>
-            <span class="text-xs font-medium text-primary-500 bg-primary-50 px-2.5 py-1 rounded-full">June 15, 2025</span>
+            <span id="todayDate" class="text-xs font-medium text-primary-500 bg-primary-50 px-2.5 py-1 rounded-full"></span>
           </div>
           
-          <div class="divide-y divide-primary-50">
+          <div id="todayList" class="divide-y divide-primary-50">
             <!-- Medication 1 -->
             <div class="px-6 py-4 flex items-center justify-between gap-4">
               <div class="flex items-center gap-4 min-w-0">
@@ -310,13 +308,13 @@
           <div class="flex items-center justify-center mb-4">
             <svg class="w-28 h-28" viewBox="0 0 120 120" aria-hidden="true">
               <circle cx="60" cy="60" r="50" fill="none" stroke="#CFFAFE" stroke-width="10"/>
-              <circle cx="60" cy="60" r="50" fill="none" stroke="#0891B2" stroke-width="10" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="40" class="progress-ring"/>
-              <text x="60" y="55" text-anchor="middle" class="text-2xl font-bold" fill="#164E63" font-family="Fira Code, monospace">87%</text>
+              <circle id="complianceRing" cx="60" cy="60" r="50" fill="none" stroke="#0891B2" stroke-width="10" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314" class="progress-ring"/>
+              <text id="compliancePct" x="60" y="55" text-anchor="middle" class="text-2xl font-bold" fill="#164E63" font-family="Fira Code, monospace">0%</text>
               <text x="60" y="72" text-anchor="middle" class="text-xs" fill="#6B7280" font-family="Fira Sans, sans-serif">compliance</text>
             </svg>
           </div>
           
-          <div class="grid grid-cols-7 gap-1 text-center text-xs">
+          <div id="weekBars" class="grid grid-cols-7 gap-1 text-center text-xs">
             <div>
               <div class="w-full h-8 bg-cta-100 rounded mb-1"></div>
               <span class="text-primary-500">M</span>
@@ -358,7 +356,7 @@
               Low Stock
             </h3>
           </div>
-          <div class="p-5">
+          <div id="lowStockList" class="p-5">
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium text-primary-800">Amoxicillin</p>
@@ -440,31 +438,176 @@
     </div>
   </nav>
   
+  <script src="js/supabase.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/notifications.js"></script>
   <script>
-    // Mobile menu toggle
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const mobileNav = document.getElementById('mobileNav');
-    
+
     mobileMenuBtn.addEventListener('click', () => {
       const isHidden = mobileNav.classList.contains('hidden');
       mobileNav.classList.toggle('hidden');
       mobileMenuBtn.setAttribute('aria-expanded', isHidden);
     });
-    
-    // Mark medication as taken/skipped
-    document.querySelectorAll('[class*="status-"]').forEach(el => {
-      if (el.classList.contains('status-pending')) {
-        el.style.cursor = 'pointer';
-        el.addEventListener('click', function() {
-          const actions = ['Taken', 'Skipped', 'Snoozed'];
-          const classes = ['status-taken', 'status-skipped', 'status-snoozed'];
-          const current = actions.indexOf(this.textContent);
-          const next = (current + 1) % actions.length;
-          this.textContent = actions[next];
-          this.className = this.className.replace(/status-\w+/, classes[next]);
-        });
+
+    if (requireAuth()) {
+      setHeaderUser();
+      initDashboard();
+    }
+
+    async function initDashboard() {
+      const user = Auth.getUser();
+      const firstName = user && user.name ? user.name.trim().split(/\s+/)[0] : 'there';
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+      document.getElementById('greetingName').textContent = greeting + ', ' + firstName;
+
+      const today = await api('/logs/today.php');
+      if (today.error) {
+        document.getElementById('todayList').innerHTML = '<div class="px-6 py-10 text-center text-red-500">' + escapeHtml(today.error) + '</div>';
+        return;
       }
+      renderToday(today);
+
+      const meds = await api('/medicines/index.php');
+      const list = meds.medicines || [];
+      renderLowStock(list);
+
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - 6);
+      const fmt = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const week = await api('/logs/index.php?start_date=' + fmt(start) + '&end_date=' + fmt(end));
+      renderCompliance(week);
+    }
+
+    function renderToday(today) {
+      const meds = today.medications || [];
+      const stats = today.stats || {};
+      document.getElementById('todayDate').textContent = new Date(today.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      document.getElementById('todayCount').textContent = meds.length + (meds.length === 1 ? ' medication' : ' medications');
+      document.getElementById('statTaken').textContent = stats.taken || 0;
+      document.getElementById('statPending').textContent = stats.pending || 0;
+
+      const list = document.getElementById('todayList');
+      if (!meds.length) {
+        list.innerHTML = '<div class="px-6 py-10 text-center"><p class="text-primary-500 mb-3">No medications scheduled for today.</p><a href="schedule.html" class="text-sm font-medium text-primary-500 hover:text-primary-700">Add a schedule</a></div>';
+        return;
+      }
+
+      list.innerHTML = meds.map((m) => {
+        const status = m.log_status || 'pending';
+        return '<div class="px-6 py-4 flex items-center justify-between gap-4" data-schedule-id="' + m.schedule_id + '">' +
+          '<div class="flex items-center gap-4 min-w-0">' +
+            '<div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">' +
+              '<svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>' +
+            '</div>' +
+            '<div class="min-w-0"><p class="font-medium text-primary-800 truncate">' + escapeHtml(m.medicine_name) + '</p>' +
+            '<p class="text-sm text-primary-500">' + escapeHtml(m.dosage) + ' - ' + mealLabel(m.meal_relation) + '</p></div>' +
+          '</div>' +
+          '<div class="flex items-center gap-3 flex-shrink-0">' +
+            '<span class="text-sm font-medium text-primary-600 hidden sm:block">' + formatTime(m.time) + '</span>' +
+            '<button type="button" data-status="' + status + '" class="status-badge cursor-pointer ' + statusClass(status) + ' px-2.5 py-1 rounded-full text-xs font-medium">' + statusLabel(status) + '</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    document.getElementById('todayList').addEventListener('click', async (e) => {
+      const badge = e.target.closest('.status-badge');
+      if (!badge) return;
+      const row = badge.closest('[data-schedule-id]');
+      const current = badge.dataset.status || 'pending';
+      const order = ['taken', 'skipped', 'snoozed'];
+      const next = current === 'pending' ? 'taken' : order[(order.indexOf(current) + 1) % order.length];
+
+      badge.disabled = true;
+      const res = await api('/logs/index.php', {
+        method: 'POST',
+        body: JSON.stringify({ schedule_id: Number(row.dataset.scheduleId), status: next })
+      });
+      badge.disabled = false;
+
+      if (res.error) {
+        alert(res.error);
+        return;
+      }
+
+      badge.dataset.status = next;
+      badge.textContent = statusLabel(next);
+      badge.className = 'status-badge cursor-pointer ' + statusClass(next) + ' px-2.5 py-1 rounded-full text-xs font-medium';
+
+      const today = await api('/logs/today.php');
+      if (!today.error) renderToday(today);
+      const meds = await api('/medicines/index.php');
+      renderLowStock(meds.medicines || []);
     });
+
+    function renderCompliance(week) {
+      const stats = week.stats || {};
+      const rate = Number(stats.compliance_rate) || 0;
+      document.getElementById('statWeekly').textContent = rate + '%';
+      document.getElementById('compliancePct').textContent = rate + '%';
+      document.getElementById('complianceRing').setAttribute('stroke-dashoffset', String(Math.round(314 * (1 - rate / 100))));
+
+      const byDay = {};
+      (week.logs || []).forEach((log) => {
+        if (!byDay[log.log_date]) byDay[log.log_date] = { taken: 0, skipped: 0, snoozed: 0 };
+        if (byDay[log.log_date][log.status] != null) byDay[log.log_date][log.status]++;
+      });
+
+      const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      let html = '';
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const day = byDay[key];
+        let color = 'bg-primary-50 border border-primary-200';
+        if (day && day.taken > 0) color = 'bg-cta-100';
+        if (day && day.skipped > 0) color = 'bg-yellow-100';
+        if (day && day.snoozed > 0 && !day.taken && !day.skipped) color = 'bg-primary-100';
+        html += '<div><div class="w-full h-8 rounded mb-1 ' + color + '"></div><span class="text-primary-500">' + labels[d.getDay()] + '</span></div>';
+      }
+      document.getElementById('weekBars').innerHTML = html;
+    }
+
+    function renderLowStock(meds) {
+      const low = meds.filter((m) => Number(m.current_stock) <= Number(m.low_stock_threshold));
+      document.getElementById('statLowStock').textContent = low.length;
+      const box = document.getElementById('lowStockList');
+
+      if (!low.length) {
+        box.innerHTML = '<p class="text-sm text-primary-500">All stock levels are healthy.</p>';
+        return;
+      }
+
+      box.innerHTML = low.map((m) => {
+        const current = Number(m.current_stock);
+        const total = Number(m.total_stock) || current || 1;
+        const pct = Math.max(3, Math.min(100, Math.round((current / total) * 100)));
+        return '<div class="mb-4 last:mb-0">' +
+          '<div class="flex items-center justify-between">' +
+            '<div><p class="font-medium text-primary-800">' + escapeHtml(m.name) + '</p>' +
+            '<p class="text-sm text-primary-500">' + current + ' left</p></div>' +
+            '<button type="button" onclick="refillMedicine(' + m.id + ')" class="text-xs font-medium text-cta-600 hover:text-cta-700 bg-cta-50 hover:bg-cta-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">Refill</button>' +
+          '</div>' +
+          '<div class="mt-3 w-full bg-primary-100 rounded-full h-2"><div class="' + (pct <= 20 ? 'bg-red-500' : 'bg-yellow-500') + ' h-2 rounded-full" style="width: ' + pct + '%"></div></div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function refillMedicine(id) {
+      const res = await api('/medicines/stock.php?id=' + id, {
+        method: 'PUT',
+        body: JSON.stringify({ action: 'increment', amount: 30 })
+      });
+      if (res.error) { alert(res.error); return; }
+      const meds = await api('/medicines/index.php');
+      renderLowStock(meds.medicines || []);
+    }
   </script>
 </body>
 </html>

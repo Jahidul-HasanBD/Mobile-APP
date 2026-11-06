@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build:android": "node scripts/build-android.js",
     "copy-web": "powershell -Command \"if (!(Test-Path www)) { New-Item -ItemType Directory www | Out-Null }; Copy-Item *.html www\\ -Force; if (!(Test-Path www\\js)) { New-Item -ItemType Directory www\\js | Out-Null }; Copy-Item js\\* www\\js\\ -Force -ErrorAction SilentlyContinue; Write-Host 'Web files copied to www/'\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

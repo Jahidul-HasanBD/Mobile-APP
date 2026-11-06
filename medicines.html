@@ -2,31 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Medicines - MedRemind</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { 50: '#ECFEFF', 100: '#CFFAFE', 200: '#A5F3FC', 300: '#67E8F9', 400: '#22D3EE', 500: '#0891B2', 600: '#0E7490', 700: '#155E75', 800: '#164E63', 900: '#083344' },
-            cta: { 50: '#ECFDF5', 100: '#D1FAE5', 200: '#A7F3D0', 300: '#6EE7B7', 400: '#34D399', 500: '#059669', 600: '#047857', 700: '#065F46', 800: '#064E3B', 900: '#022C22' },
-          },
-          fontFamily: {
-            heading: ['Fira Code', 'monospace'],
-            body: ['Fira Sans', 'sans-serif'],
-          },
-        },
-      },
-    }
-  </script>
+  <link rel="stylesheet" href="css/tailwind.css">
   <style>
-    * { font-family: 'Fira Sans', sans-serif; }
-    h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Fira Code', monospace; }
+    * { font-family: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     
     .nav-link { transition: color 200ms ease, background-color 200ms ease; }
     .nav-link.active { color: #0891B2; background-color: #ECFEFF; }
@@ -71,6 +55,20 @@
     .stock-low { color: #DC2626; }
     .stock-ok { color: #059669; }
     
+    /* Edge-to-edge Android (targetSdk 35+): the webview is drawn under the
+       status bar / navigation bar, so the page keeps its own chrome clear of
+       them. Capacitor 8's SystemBars plugin injects the real values as
+       --safe-area-inset-* (env() reports wrong values on Android WebView < 140);
+       env() stays the fallback. On old webviews the plugin insets the webview
+       natively instead and these variables are 0, so the two never stack. */
+    header.sticky {
+      padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    }
+    @media (max-width: 767px) {
+      body { padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
+    }
+    nav.fixed.bottom-0 { padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)); }
+
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }
     }
@@ -113,7 +111,7 @@
         <div class="flex items-center gap-3">
           <a href="profile.html" class="flex items-center gap-2">
             <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span class="text-sm font-medium text-primary-600">JD</span>
+              <span class="text-sm font-medium text-primary-600" data-user-initials>JD</span>
             </div>
           </a>
           <button id="mobileMenuBtn" class="md:hidden p-2 text-primary-600 hover:text-primary-800 transition-colors cursor-pointer" aria-label="Open menu" aria-expanded="false">
@@ -365,7 +363,10 @@
         <form onsubmit="handleAddMedication(event)" class="space-y-4">
           <div>
             <label for="medName" class="block text-sm font-medium text-primary-700 mb-1">Medicine Name *</label>
-            <input type="text" id="medName" required class="input-focus w-full px-4 py-2.5 bg-primary-50 border border-primary-100 rounded-lg text-primary-800 placeholder-primary-400 transition-all duration-200" placeholder="e.g., Amoxicillin">
+            <input type="text" id="medName" required autocomplete="off" oninput="onMedNameInput(this.value)" class="input-focus w-full px-4 py-2.5 bg-primary-50 border border-primary-100 rounded-lg text-primary-800 placeholder-primary-400 transition-all duration-200" placeholder="e.g., Amoxicillin">
+            <!-- Suggestions come from the Supabase medicine catalog -->
+            <div id="medSuggestions" class="hidden mt-1 bg-white border border-primary-200 rounded-lg shadow-lg max-h-56 overflow-y-auto"></div>
+            <p id="medSearchHint" class="hidden mt-1 text-xs text-primary-500"></p>
           </div>
           
           <div class="grid grid-cols-2 gap-4">
@@ -497,59 +498,145 @@
     </div>
   </nav>
   
+  <script src="js/supabase.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/config.js"></script>
   <script>
-    // Mobile menu toggle
     document.getElementById('mobileMenuBtn').addEventListener('click', () => {
       const nav = document.getElementById('mobileNav');
       const isHidden = nav.classList.contains('hidden');
       nav.classList.toggle('hidden');
       document.getElementById('mobileMenuBtn').setAttribute('aria-expanded', isHidden);
     });
-    
-    // Modal functions
+
     function openModal(id) {
       document.getElementById(id).classList.remove('hidden');
       document.body.style.overflow = 'hidden';
     }
-    
+
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
       document.body.style.overflow = '';
+      if (id === 'addModal') {
+        document.getElementById('medSuggestions').classList.add('hidden');
+        document.getElementById('medSearchHint').classList.add('hidden');
+      }
     }
-    
-    // Toggle context menu
+
+    // ---- Medicine search (Supabase) -------------------------------------
+    // The catalog lives in Supabase, so this is the one part of this screen
+    // that needs the network. Typing a name manually always works offline.
+    let medSuggestions = [];
+    let medSuggestionsTimer = null;
+
+    function onMedNameInput(value) {
+      const box = document.getElementById('medSuggestions');
+      const hint = document.getElementById('medSearchHint');
+      clearTimeout(medSuggestionsTimer);
+
+      const query = String(value || '').trim();
+      if (query.length < 2) {
+        box.classList.add('hidden');
+        hint.classList.add('hidden');
+        return;
+      }
+
+      medSuggestionsTimer = setTimeout(() => loadMedicineSuggestions(query), 350);
+    }
+
+    async function loadMedicineSuggestions(query) {
+      const box = document.getElementById('medSuggestions');
+      const hint = document.getElementById('medSearchHint');
+
+      if (!isOnline()) {
+        box.classList.add('hidden');
+        hint.textContent = 'Medicine search needs internet. You can still type the name yourself.';
+        hint.classList.remove('hidden');
+        return;
+      }
+
+      hint.textContent = 'Searching the medicine catalog...';
+      hint.classList.remove('hidden');
+
+      const res = await api('/medicines/search.php?q=' + encodeURIComponent(query));
+
+      if (res.error) {
+        box.classList.add('hidden');
+        hint.textContent = res.error;
+        return;
+      }
+
+      medSuggestions = res.results || [];
+      if (!medSuggestions.length) {
+        box.classList.add('hidden');
+        hint.textContent = 'Nothing in the catalog matched. You can still add it manually.';
+        return;
+      }
+
+      hint.classList.add('hidden');
+      box.innerHTML = medSuggestions.map((item, index) => {
+        const detail = [item.generic_name, item.strength, item.form].filter(Boolean).join(' · ');
+        return '<button type="button" onclick="applyMedicineSuggestion(' + index + ')" class="w-full text-left px-3 py-2 hover:bg-primary-50 border-b border-primary-100 last:border-b-0 cursor-pointer">' +
+          '<span class="block text-sm font-medium text-primary-800">' + escapeHtml(item.name) + '</span>' +
+          (detail ? '<span class="block text-xs text-primary-500">' + escapeHtml(detail) + '</span>' : '') +
+        '</button>';
+      }).join('');
+      box.classList.remove('hidden');
+    }
+
+    function applyMedicineSuggestion(index) {
+      const item = medSuggestions[index];
+      if (!item) return;
+
+      document.getElementById('medName').value = item.name || '';
+      if (item.strength) document.getElementById('medDosage').value = item.strength;
+      if (item.instructions) document.getElementById('medInstructions').value = item.instructions;
+
+      document.getElementById('medSuggestions').classList.add('hidden');
+      document.getElementById('medSearchHint').classList.add('hidden');
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('#medSuggestions') && event.target.id !== 'medName') {
+        document.getElementById('medSuggestions').classList.add('hidden');
+      }
+    });
+
     function toggleMenu(id) {
       document.querySelectorAll('[id^="menu"]').forEach(menu => {
         if (menu.id !== id) menu.classList.add('hidden');
       });
       document.getElementById(id).classList.toggle('hidden');
     }
-    
-    // Close menus on outside click
+
     document.addEventListener('click', (e) => {
       if (!e.target.closest('[onclick*="toggleMenu"]')) {
         document.querySelectorAll('[id^="menu"]').forEach(menu => menu.classList.add('hidden'));
       }
     });
-    
-    // Search and filter
+
     const searchInput = document.getElementById('searchInput');
     const filterStock = document.getElementById('filterStock');
-    
+    const medicationsList = document.getElementById('medicationsList');
+    let medicinesById = {};
+    let editingId = null;
+    let deletingId = null;
+
     function filterMedications() {
       const query = searchInput.value.toLowerCase();
       const stockFilter = filterStock.value;
-      const cards = document.querySelectorAll('#medicationsList > div');
+      const cards = document.querySelectorAll('#medicationsList > div[data-name]');
       let visibleCount = 0;
-      
+
       cards.forEach(card => {
         const name = card.dataset.name;
-        const stock = parseInt(card.dataset.stock);
+        const stock = parseInt(card.dataset.stock, 10);
+        const threshold = parseInt(card.dataset.low, 10);
         const matchesSearch = name.includes(query);
-        const matchesStock = stockFilter === 'all' || 
-          (stockFilter === 'low' && stock <= 10) || 
-          (stockFilter === 'ok' && stock > 10);
-        
+        const matchesStock = stockFilter === 'all' ||
+          (stockFilter === 'low' && stock <= threshold) ||
+          (stockFilter === 'ok' && stock > threshold);
+
         if (matchesSearch && matchesStock) {
           card.style.display = '';
           visibleCount++;
@@ -557,55 +644,180 @@
           card.style.display = 'none';
         }
       });
-      
+
       document.getElementById('emptyState').classList.toggle('hidden', visibleCount > 0);
     }
-    
+
     searchInput.addEventListener('input', filterMedications);
     filterStock.addEventListener('change', filterMedications);
-    
-    // Add medication
-    function handleAddMedication(e) {
+
+    if (requireAuth()) {
+      setHeaderUser();
+      loadMedicines();
+    }
+
+    async function loadMedicines() {
+      medicationsList.innerHTML = '<p class="text-primary-500 py-8">Loading medications...</p>';
+      const data = await api('/medicines/index.php');
+      if (data.error) {
+        medicationsList.innerHTML = '<p class="text-red-500 py-8">' + escapeHtml(data.error) + '</p>';
+        return;
+      }
+
+      medicinesById = {};
+      (data.medicines || []).forEach(m => { medicinesById[m.id] = m; });
+      renderMedicines(data.medicines || []);
+      filterMedications();
+    }
+
+    function renderMedicines(meds) {
+      if (!meds.length) {
+        medicationsList.innerHTML = '';
+        document.getElementById('emptyState').classList.remove('hidden');
+        return;
+      }
+
+      medicationsList.innerHTML = meds.map(m => {
+        const current = Number(m.current_stock);
+        const total = Number(m.total_stock) || current || 1;
+        const threshold = Number(m.low_stock_threshold);
+        const low = current <= threshold;
+        const pct = Math.max(3, Math.min(100, Math.round((current / total) * 100)));
+        const schedule = (m.schedules || [])[0];
+        const next = schedule ? 'Next: ' + formatTime(schedule.time) : 'No schedule set';
+
+        return '<div class="bg-white rounded-xl card-shadow card-hover overflow-hidden" data-name="' + escapeHtml(String(m.name).toLowerCase()) + '" data-stock="' + current + '" data-low="' + threshold + '">' +
+          '<div class="p-5">' +
+            '<div class="flex items-start justify-between mb-3">' +
+              '<div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">' +
+                '<svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>' +
+              '</div>' +
+              '<div class="relative">' +
+                '<button onclick="toggleMenu(\'menu' + m.id + '\')" class="p-1 text-primary-400 hover:text-primary-600 transition-colors cursor-pointer" aria-label="More options">' +
+                  '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>' +
+                '</button>' +
+                '<div id="menu' + m.id + '" class="hidden absolute right-0 mt-1 w-32 bg-white rounded-lg shadow-lg border border-primary-100 z-10">' +
+                  '<button onclick="openEditModal(' + m.id + ')" class="w-full text-left px-3 py-2 text-sm text-primary-700 hover:bg-primary-50 cursor-pointer">Edit</button>' +
+                  '<button onclick="confirmDelete(' + m.id + ')" class="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer">Delete</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<h3 class="font-heading text-lg font-semibold text-primary-800 mb-1">' + escapeHtml(m.name) + '</h3>' +
+            '<p class="text-sm text-primary-500 mb-3">' + escapeHtml(m.dosage) + (schedule ? ' - ' + mealLabel(schedule.meal_relation) : '') + '</p>' +
+            '<p class="text-xs text-primary-400 mb-4">' + escapeHtml(m.instructions || 'No instructions') + '</p>' +
+            '<div class="flex items-center justify-between">' +
+              '<div><p class="text-xs text-primary-500 mb-1">Stock</p>' +
+                '<p class="text-sm font-semibold ' + (low ? 'stock-low' : 'stock-ok') + '">' + current + ' pills remaining</p></div>' +
+              '<div class="w-20 bg-primary-100 rounded-full h-2"><div class="' + (low ? 'bg-red-500' : 'bg-cta-500') + ' h-2 rounded-full" style="width: ' + pct + '%"></div></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="px-5 py-3 bg-primary-50 border-t border-primary-100 flex items-center justify-between">' +
+            '<span class="text-xs text-primary-500">' + next + '</span>' +
+            (low
+              ? '<button onclick="refillMedicine(' + m.id + ')" class="text-xs font-medium text-cta-600 hover:text-cta-700 bg-cta-50 hover:bg-cta-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">Refill</button>'
+              : '<span class="text-xs text-primary-400">In stock</span>') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function handleAddMedication(e) {
       e.preventDefault();
-      const name = document.getElementById('medName').value;
-      const dosage = document.getElementById('medDosage').value;
-      const stock = document.getElementById('medStock').value;
+      const name = document.getElementById('medName').value.trim();
+      const dosage = document.getElementById('medDosage').value.trim();
+      const stock = Number(document.getElementById('medStock').value) || 0;
       const meal = document.getElementById('medMeal').value;
-      const instructions = document.getElementById('medInstructions').value;
-      
+      const instructions = document.getElementById('medInstructions').value.trim();
+
+      const res = await api('/medicines/index.php', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name,
+          dosage: dosage,
+          instructions: instructions,
+          total_stock: stock,
+          current_stock: stock,
+          low_stock_threshold: Math.max(5, Math.ceil(stock * 0.1)),
+          schedules: [{ time: '08:00:00', meal_relation: meal || 'no_relation', repeat_type: 'daily' }]
+        })
+      });
+
+      if (res.error) { alert(res.error); return; }
       closeModal('addModal');
       e.target.reset();
-      alert('Medication "' + name + '" added successfully!');
+      await loadMedicines();
     }
-    
-    // Edit medication
-    function openEditModal(name, dosage, meal, stock, instructions) {
-      document.getElementById('editMedName').value = name;
-      document.getElementById('editMedDosage').value = dosage;
-      document.getElementById('editMedStock').value = stock;
-      document.getElementById('editMedMeal').value = meal === 'Before meal' ? 'before_meal' : meal === 'After meal' ? 'after_meal' : 'no_relation';
-      document.getElementById('editMedInstructions').value = instructions;
+
+    function openEditModal(id) {
+      const m = medicinesById[id];
+      if (!m) return;
+      editingId = id;
+      document.getElementById('editMedName').value = m.name;
+      document.getElementById('editMedDosage').value = m.dosage;
+      document.getElementById('editMedStock').value = m.total_stock;
+      document.getElementById('editMedMeal').value = (m.schedules && m.schedules[0]) ? m.schedules[0].meal_relation : 'no_relation';
+      document.getElementById('editMedInstructions').value = m.instructions || '';
       openModal('editModal');
     }
-    
-    function handleEditMedication(e) {
+
+    async function handleEditMedication(e) {
       e.preventDefault();
+      if (!editingId) return;
+      const current = medicinesById[editingId];
+      const total = Number(document.getElementById('editMedStock').value) || 0;
+      const meal = document.getElementById('editMedMeal').value;
+
+      const res = await api('/medicines/single.php?id=' + editingId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: document.getElementById('editMedName').value.trim(),
+          dosage: document.getElementById('editMedDosage').value.trim(),
+          instructions: document.getElementById('editMedInstructions').value.trim(),
+          total_stock: Math.max(total, Number(current.current_stock))
+        })
+      });
+
+      if (res.error) { alert(res.error); return; }
+
+      const schedule = (current.schedules || [])[0];
+      if (schedule && schedule.meal_relation !== meal) {
+        await api('/schedules/single.php?id=' + schedule.id, {
+          method: 'PUT',
+          body: JSON.stringify({ meal_relation: meal })
+        });
+      }
+
       closeModal('editModal');
-      alert('Medication updated successfully!');
+      editingId = null;
+      await loadMedicines();
     }
-    
-    // Delete medication
-    function confirmDelete(name) {
-      document.getElementById('deleteMedName').textContent = name;
+
+    function confirmDelete(id) {
+      const m = medicinesById[id];
+      if (!m) return;
+      deletingId = id;
+      document.getElementById('deleteMedName').textContent = m.name;
       openModal('deleteModal');
     }
-    
-    function handleDelete() {
+
+    async function handleDelete() {
+      if (!deletingId) return;
+      const res = await api('/medicines/single.php?id=' + deletingId, { method: 'DELETE' });
+      if (res.error) { alert(res.error); return; }
       closeModal('deleteModal');
-      alert('Medication deleted successfully!');
+      deletingId = null;
+      await loadMedicines();
     }
-    
-    // Check for hash to open add modal
+
+    async function refillMedicine(id) {
+      const res = await api('/medicines/stock.php?id=' + id, {
+        method: 'PUT',
+        body: JSON.stringify({ action: 'increment', amount: 30 })
+      });
+      if (res.error) { alert(res.error); return; }
+      await loadMedicines();
+    }
+
     if (window.location.hash === '#add') {
       openModal('addModal');
     }
